@@ -3,6 +3,8 @@
 ### For detailled explanations about all the avalaible options,
 ### please refer to https://github.com/sudar/Arduino-Makefile/blob/master/arduino-mk-vars.md
 
+
+
 ### PROJECT_DIR
 ### This is the path to where you have created/cloned your project
 PROJECT_DIR       = $(shell dirname $(shell dirname $(shell pwd)))
@@ -30,7 +32,7 @@ USER_LIB_PATH     :=  $(realpath $(PROJECT_DIR)/lib)
 ### For Arduino IDE 1.6.x
 ### Both BOARD_TAG and BOARD_SUB are needed. They must be set to the board you are currently using. (i.e BOARD_TAG = uno, mega, etc. & BOARD_SUB = atmega2560, etc.)
 ### Note: for the Arduino Uno, only BOARD_TAG is mandatory and BOARD_SUB can be equal to anything
-BOARD_TAG         = mega
+BOARD_TAG         = uno
 BOARD_SUB         = atmega2560
 
 ### MONITOR_BAUDRATE
@@ -44,6 +46,7 @@ AVR_TOOLS_DIR     = /usr
 ### AVRDUDE
 ### Path to avrdude directory.
 AVRDUDE          = /usr/bin/avrdude
+AVRDUDE_CONF = /etc/avrdude.conf
 
 ### CFLAGS_STD
 CFLAGS_STD        = -std=gnu11

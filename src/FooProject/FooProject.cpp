@@ -1,23 +1,21 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include "FooLib.h"
-
-FooClass FooObject;
+#include <LiquidCrystal_I2C.h>
+//Found This value after scanning
+LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 
 void setup() {
-
-	Serial.begin(115200);
+	lcd.init();
+	lcd.backlight();
+  	lcd.setCursor(0, 0); // set the cursor to column 3, line 0
+  
+	lcd.print("HELLO WORLD");
 	delay(1000);
 
 }
 
 void loop() {
-
-	Serial.println("Hello world");
-	FooObject.firstFooMethod();
-	delay(1000);
-	FooObject.secondFooMethod();
-	delay(1000);
+	//lcd.print("HELLO WORLD");
 
 }
 
