@@ -14,8 +14,12 @@
 #define CYAN 6
 #define WHITE 7
 
-LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 #define DISK1 0x50 //Address of 24LC256 EEPROM chip
+
+LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
+
+#define CONNECTED_PIN 11 //Pin in the arduino mega to check if the cartridge is connected or not. periodically check. 
+#define MAX_VOLTAGE_READING 20.0 //max voltage reading for arduino mega
 
 void set_lcd_color(unsigned int COLOR);
 void writeEEPROM(int deviceaddress, unsigned int eeaddress, 
@@ -25,8 +29,15 @@ void readEEPROM(int deviceaddress, unsigned int eeaddress,
 				char* data, unsigned int num_chars);
 
 void setup_gues_info(char* version, char* name, char* pot_names, char* pot_function); //setups the gues
+
 void power_off(); // saves the state of the pots 
-void setup() {
+
+void hot_swap(); //allows for hot swapping game catridges: requirements- must use arduino mega 
+
+
+
+void setup() 
+{
 	Wire.begin(); //enables the pullup resistors in sda scl
 	lcd.init();
 	//lcd.backlight();
@@ -58,13 +69,16 @@ void setup() {
 	pinMode(BLUE_PIN, OUTPUT);
 	pinMode(GREEN_PIN, OUTPUT);
 	set_lcd_color(BLUE);
-	
+
+	//initialize catridge checker pin 
+	pinMode(CONNECTED_PIN, INPUT);
 }
 
-void loop() {
+void loop() 
+{
 	//lcd.print("HELLO WORLD");
-
 }
+
 void writeEEPROM(int deviceaddress, unsigned int eeaddress, 
 				 char* data ) 
 {
@@ -105,4 +119,19 @@ void set_lcd_color(unsigned int color)
 		delay(100);
 	}
 	return;
+}
+
+void hot_swap()
+{
+	//to detect if the user disconnected the cartridge, 
+	//place resistors next to cartridge and check voltage 
+	int slot_voltage = analogRead(CONNECTED_PIN);
+	float voltage = slot_voltage * (MAX_VOLTAGE_READING)/1023.0;
+	if(voltage < 0.1) //some arbitrary threshold 
+	{
+		//turn off the slot to prevent accidents? 
+	}
+
+	
+	return;	
 }
