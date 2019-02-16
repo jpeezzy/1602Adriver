@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <pins_arduino.h>
 //Found This value after scanning
 #define RED_PIN 5
 #define GREEN_PIN 6
@@ -15,11 +16,13 @@
 #define WHITE 7
 
 #define DISK1 0x50 //Address of 24LC256 EEPROM chip
+LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16 chars 
+									//and 2 line display
 
-LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
-
-#define CONNECTED_PIN 11 //Pin in the arduino mega to check if the cartridge is connected or not. periodically check. 
+#define CONNECTED_PIN 11 //Pin in the arduino mega to check if the 
+						 //cartridge is connected or not. periodically check. 
 #define MAX_VOLTAGE_READING 20.0 //max voltage reading for arduino mega
+#define INTERRUPT_PIN 21 //check if catridge is pulled out
 
 void set_lcd_color(unsigned int COLOR);
 void writeEEPROM(int deviceaddress, unsigned int eeaddress, 
@@ -40,10 +43,11 @@ void setup()
 {
 	Wire.begin(); //enables the pullup resistors in sda scl
 	lcd.init();
-	//lcd.backlight();
+	lcd.backlight();
 	lcd.setCursor(0, 0); // set the cursor to column 3, line 0
 	//set eeprom address to 000 (for now)
 	//the address is 1010 A2 A1 A0. 
+	
 	//If A0-A2 is 0, the addresss for the eeprom is 0x50
 	for(int i = 0; i < 3; i++)
 	{
@@ -64,14 +68,17 @@ void setup()
 	char buf[64] = {0};
 	readEEPROM(DISK1, address, (char*)buf, 10);
 	lcd.print((char*)buf);
-	delay(100);
+	delay(300);
 	pinMode(RED_PIN, OUTPUT);
 	pinMode(BLUE_PIN, OUTPUT);
 	pinMode(GREEN_PIN, OUTPUT);
-	set_lcd_color(BLUE);
+	
+	set_lcd_color(RED);
 
 	//initialize catridge checker pin 
-	pinMode(CONNECTED_PIN, INPUT);
+	//pinMode(CONNECTED_PIN, INPUT);
+	//attach interrupt
+	attachInterrupt(INTERRUPT_PIN, hot_swap, CHANGE);
 }
 
 void loop() 
@@ -111,7 +118,7 @@ void readEEPROM(int deviceaddress, unsigned int eeaddress,
 
 void set_lcd_color(unsigned int color)
 {
-	if(color>=1 & color<8){
+	if(color>=1 && color<8){
 //		printf("%d", (((color & 0b010) > 1)));
 		digitalWrite(RED_PIN, (((color & 0b001) == 1) ? HIGH:LOW));
 		digitalWrite(GREEN_PIN, (((color & 0b010) == 2) ? HIGH:LOW));
@@ -133,5 +140,5 @@ void hot_swap()
 	}
 
 	
-	return;	
+//	return;	
 }

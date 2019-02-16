@@ -32,7 +32,7 @@ USER_LIB_PATH     :=  $(realpath $(PROJECT_DIR)/lib)
 ### For Arduino IDE 1.6.x
 ### Both BOARD_TAG and BOARD_SUB are needed. They must be set to the board you are currently using. (i.e BOARD_TAG = uno, mega, etc. & BOARD_SUB = atmega2560, etc.)
 ### Note: for the Arduino Uno, only BOARD_TAG is mandatory and BOARD_SUB can be equal to anything
-BOARD_TAG         = mega
+BOARD_TAG         = mega2560
 BOARD_SUB         = atmega2560
 
 ### MONITOR_BAUDRATE
@@ -65,8 +65,8 @@ endif
 
 ### MONITOR_PORT
 ### The port your board is connected to. Using an '*' tries all the ports and finds the right one. Choose one of the two.
-MONITOR_PORT      = /dev/ttyUSB*
-# MONITOR_PORT      = /dev/ttyACM*
+#MONITOR_PORT      = /dev/ttyUSB*
+MONITOR_PORT      = /dev/ttyACM*
 
 ### don't touch this
 CURRENT_DIR       = $(shell basename $(CURDIR))
