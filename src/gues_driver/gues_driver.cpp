@@ -15,41 +15,48 @@
 #define CYAN 6
 #define WHITE 7
 
-#define CONNECTED_PIN A7 //Interrupt Pin
+#define CONNECTED_PIN 3 //Interrupt Pin
 #define MAX_VOLTAGE_READING 5 //Max Voltage 
-#define SWAP_GND 8 //NO CARTRIDGE GND
 #define INTERRUPT_PIN INT5 //check if catridge is pulled out
+#define WRITE_PROTECT 3
 
 #define DISK1 0x50 //Address of 24LC256 EEPROM chip
+#define MAX_SAVE_SIZE 16
+#define MAX_NAME_SIZE 10
+#define EEPROM_address 0
 
 LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16x2 display
+
 volatile byte CARTRIDGE_INSERTED = HIGH;
 int C_LOOP = 0;
+int device_num = 0; 
+byte address = 0;
+byte error = 0;
+char buf[MAX_SAVE_SIZE] = {0};
+char pedal_name[MAX_NAME_SIZE] = {0};
 
 void set_lcd_color(unsigned int COLOR);
 void writeEEPROM(int deviceaddress, unsigned int eeaddress, 
-				 char* data );
+		char* data );
 
 void readEEPROM(int deviceaddress, unsigned int eeaddress,
-				char* data, unsigned int num_chars);
+		char* data, unsigned int num_chars);
 
 void setup_gues_info(char* version, char* name, char* pot_names, char* pot_function); //setups the gues
 
 void power_off(); // saves the state of the pots 
 
 void hot_swap(); //allows for hot swapping game catridges: requirements- must use arduino mega 
-
+void get_pedal_name(char* INFO, char* NAME);
 void setup() 
 {
 	//Serial.begin(9600);
-	Wire.begin(); //enables the pullup resistors in sda scl
+	Wire.begin(); //enables pullup resistors in SDA/SCL
 	lcd.init();
 	lcd.backlight();
 	lcd.setCursor(0, 0); // set the cursor to column 3, line 0
-	//set eeprom address to 000 (for now)
-	//the address is 1010 A2 A1 A0. 
-	
-	//If A0-A2 is 0, the addresss for the eeprom is 0x50
+	//{A2, A1, A0} == 000 (for now)
+	//EEPROM ADDRESS = {1010, A2, A1, A0} = 0x50
 	for(int i = 0; i < 3; i++)
 	{
 		pinMode(i, OUTPUT);
@@ -57,50 +64,74 @@ void setup()
 	}
 	//This eeprom has between 0 and 32,767 addresses,
 	//we start with 0
-	unsigned int address = 0;
 	//String that is sent to the EEPROM, must be less than 
 	//64 characters
-	//char* PEDAL_DATA= (char*)("FUZZ/2/RED");
-	//writeEEPROM(DISK1, address, PEDAL_DATA);
+	/*
+	   char* PEDAL_DATA= (char*)("FUZZ/2/RED");
+	   writeEEPROM(DISK1, address, PEDAL_DATA);
 
 	//PIN 3 is WP, so after writing data, set if off.
-	digitalWrite(3,HIGH);
+	*/
+	digitalWrite(WRITE_PROTECT,HIGH);
 
-	char buf[16] = {0};
-	readEEPROM(DISK1, address, (char*)buf, 10);
-	lcd.print((char*)buf);
+	readEEPROM(DISK1, EEPROM_address, (char*)buf, 10);
+	get_pedal_name(buf, pedal_name);
+
+	lcd.print((char*)pedal_name);
 	delay(300);
 	pinMode(RED_PIN, OUTPUT);
 	pinMode(BLUE_PIN, OUTPUT);
 	pinMode(GREEN_PIN, OUTPUT);
-	
 	set_lcd_color(RED);
-
-	//initialize catridge checker pin 
-	//pinMode(CONNECTED_PIN, INPUT);
-	//attach interrupt
-	//pinMode(INTERRUPT_PIN, INPUT_PULLUP);
-	attachInterrupt(INTERRUPT_PIN, hot_swap, LOW);
+	//ATTACH INTERRUPT
+	attachInterrupt(INTERRUPT_PIN, hot_swap, CHANGE);
 }
 
 void loop() 
 {
-	if((CARTRIDGE_INSERTED == 0) && (C_LOOP == 0))
+	if((CARTRIDGE_INSERTED == 0))
 	{
-		set_lcd_color(WHITE);
-		C_LOOP = 1;
-		lcd.clear();
-		delay(100);
-		char cstr[10] = "INSERT";
-		lcd.print(cstr);
-		delay(100);
-		pinMode(SWAP_GND, OUTPUT);
-		digitalWrite(SWAP_GND,LOW);
+		if(C_LOOP == 0)
+		{
+			device_num = 0;
+			for(address = 0; address < 127; address++) {
+				Wire.beginTransmission(address);
+				error = Wire.endTransmission(); 
+				if(error == 0)
+				{
+					device_num++;
+				}
+			}
+			if((device_num == 1) && (C_LOOP == 0))
+			{
+				set_lcd_color(WHITE);
+				C_LOOP = 1;
+				lcd.clear();
+				delay(100);
+				char cstr[10] = "INSERT";
+				lcd.print(cstr);
+				delay(100);
+			}
+		}
+		else
+		{
+			for(int i = 0; i < MAX_SAVE_SIZE; i++)
+			{
+				buf[i] = 0;
+			}
+			for(int i = 0; i < MAX_NAME_SIZE; i++)
+			{
+				pedal_name[i] = 0;
+			}
+			readEEPROM(DISK1, EEPROM_address, (char*)buf, MAX_NAME_SIZE);
+			get_pedal_name(buf, pedal_name);
+			CARTRIDGE_INSERTED = 1;
+		}
 	}
 }
 
 void writeEEPROM(int deviceaddress, unsigned int eeaddress, 
-				 char* data ) 
+		char* data ) 
 {
 	Wire.beginTransmission(deviceaddress);
 	Wire.write((int)(eeaddress >> 8));   // MSB
@@ -116,7 +147,7 @@ void writeEEPROM(int deviceaddress, unsigned int eeaddress,
 }
 
 void readEEPROM(int deviceaddress, unsigned int eeaddress,
-				char* data, unsigned int num_chars) 
+		char* data, unsigned int num_chars) 
 {
 	unsigned char i = 0;
 	Wire.beginTransmission(deviceaddress);
@@ -142,15 +173,18 @@ void set_lcd_color(unsigned int color)
 
 void hot_swap()
 {
-	unsigned int slot_voltage = analogRead(CONNECTED_PIN);
-	float voltage = slot_voltage * 5.0/1023.0;
-	if(voltage < 1.0)
+	CARTRIDGE_INSERTED = 0;
+}
+
+void get_pedal_name(char* INFO, char* NAME)
+{
+	for(int i = 0; i < MAX_SAVE_SIZE; i++)
 	{
-		CARTRIDGE_INSERTED = LOW;
+		if(INFO[i] == '/')
+		{
+			return;
+		}
+		NAME[i] = INFO[i];
 	}
-	else 
-	{
-		CARTRIDGE_INSERTED = HIGH;
-	}
-	return;	
+	return;
 }
