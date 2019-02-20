@@ -27,7 +27,7 @@
 
 LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16x2 display
 
-volatile byte CARTRIDGE_INSERTED = HIGH;
+volatile byte CARTRIDGE_INTERRUPT = HIGH;
 int C_LOOP = 0;
 int device_num = 0; 
 byte address = 0;
@@ -48,6 +48,7 @@ void power_off(); // saves the state of the pots
 
 void hot_swap(); //allows for hot swapping game catridges: requirements- must use arduino mega 
 void get_pedal_name(char* INFO, char* NAME);
+
 void setup() 
 {
 	//Serial.begin(9600);
@@ -57,12 +58,11 @@ void setup()
 	lcd.setCursor(0, 0); // set the cursor to column 3, line 0
 	//{A2, A1, A0} == 000 (for now)
 	//EEPROM ADDRESS = {1010, A2, A1, A0} = 0x50
-	for(int i = 0; i < 3; i++)
-	{
+	for(int i = 0; i < 3; i++) {
 		pinMode(i, OUTPUT);
 		digitalWrite(i, LOW);
 	}
-	//This eeprom has between 0 and 32,767 addresses,
+	//EEPROM has 0-32,767 addresses,
 	//we start with 0
 	//String that is sent to the EEPROM, must be less than 
 	//64 characters
@@ -89,21 +89,17 @@ void setup()
 
 void loop() 
 {
-	if((CARTRIDGE_INSERTED == 0))
-	{
-		if(C_LOOP == 0)
-		{
+	if(CARTRIDGE_INTERRUPT == LOW) {
+		if(C_LOOP == 0) {
 			device_num = 0;
 			for(address = 0; address < 127; address++) {
 				Wire.beginTransmission(address);
 				error = Wire.endTransmission(); 
-				if(error == 0)
-				{
+				if(error == 0) {
 					device_num++;
 				}
 			}
-			if((device_num == 1) && (C_LOOP == 0))
-			{
+			if(device_num == 1) {
 				set_lcd_color(WHITE);
 				C_LOOP = 1;
 				lcd.clear();
@@ -111,21 +107,41 @@ void loop()
 				char cstr[10] = "INSERT";
 				lcd.print(cstr);
 				delay(100);
+				C_LOOP = 1;
+				digitalWrite(WRITE_PROTECT, LOW);
+				CARTRIDGE_INTERRUPT = HIGH;
 			}
 		}
-		else
-		{
-			for(int i = 0; i < MAX_SAVE_SIZE; i++)
-			{
-				buf[i] = 0;
+	}
+	else {
+		if(C_LOOP == 1) {
+			//RESET I2C PROTOCOL
+			TWCR = 0;
+			Wire.begin(); //enables pullup resistors in SDA/SCL
+			device_num = 0;
+			for(address = 0; address < 127; address++) {
+				Wire.beginTransmission(address);
+				error = Wire.endTransmission(); 
+				if(error == 0) {
+					device_num++;
+				}
 			}
-			for(int i = 0; i < MAX_NAME_SIZE; i++)
-			{
-				pedal_name[i] = 0;
+			if(device_num == 2) {
+				set_lcd_color(RED);
+				for(int i = 0; i < MAX_SAVE_SIZE; i++) {
+					buf[i] = 0;
+				}
+				for(int i = 0; i < MAX_NAME_SIZE; i++) {
+					pedal_name[i] = 0;
+				}
+				digitalWrite(WRITE_PROTECT, HIGH);
+				readEEPROM(DISK1, EEPROM_address, (char*)buf, MAX_NAME_SIZE);
+				get_pedal_name(buf, pedal_name);
+				lcd.clear();
+				lcd.print(pedal_name);
+				delay(100);
+				C_LOOP = 0;
 			}
-			readEEPROM(DISK1, EEPROM_address, (char*)buf, MAX_NAME_SIZE);
-			get_pedal_name(buf, pedal_name);
-			CARTRIDGE_INSERTED = 1;
 		}
 	}
 }
@@ -173,7 +189,8 @@ void set_lcd_color(unsigned int color)
 
 void hot_swap()
 {
-	CARTRIDGE_INSERTED = 0;
+	//CARTRIDGE_INSERTED = (CARTRIDGE_INSERTED == 1) ? 0: 1;
+	CARTRIDGE_INTERRUPT = LOW;
 }
 
 void get_pedal_name(char* INFO, char* NAME)
