@@ -2,7 +2,7 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <pins_arduino.h>
-
+#include "gues_driver.h"
 #define RED_PIN 5
 #define GREEN_PIN 6
 #define BLUE_PIN 7
@@ -27,27 +27,14 @@
 
 LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16x2 display
 
-volatile byte CARTRIDGE_INTERRUPT = HIGH;
+volatile byte CARTRIDGE_INTERRUPT = LOW;
 int C_LOOP = 0;
 int device_num = 0; 
 byte address = 0;
 byte error = 0;
 char buf[MAX_SAVE_SIZE] = {0};
 char pedal_name[MAX_NAME_SIZE] = {0};
-
-void set_lcd_color(unsigned int COLOR);
-void writeEEPROM(int deviceaddress, unsigned int eeaddress, 
-		char* data );
-
-void readEEPROM(int deviceaddress, unsigned int eeaddress,
-		char* data, unsigned int num_chars);
-
-void setup_gues_info(char* version, char* name, char* pot_names, char* pot_function); //setups the gues
-
-void power_off(); // saves the state of the pots 
-
-void hot_swap(); //allows for hot swapping game catridges: requirements- must use arduino mega 
-void get_pedal_name(char* INFO, char* NAME);
+char cstr[10] = "INSERT";
 
 void setup() 
 {
@@ -55,6 +42,7 @@ void setup()
 	Wire.begin(); //enables pullup resistors in SDA/SCL
 	lcd.init();
 	lcd.backlight();
+	lcd.setBacklight(255);
 	lcd.setCursor(0, 0); // set the cursor to column 3, line 0
 	//{A2, A1, A0} == 000 (for now)
 	//EEPROM ADDRESS = {1010, A2, A1, A0} = 0x50
@@ -72,6 +60,7 @@ void setup()
 
 	//PIN 3 is WP, so after writing data, set if off.
 	*/
+	pinMode(WRITE_PROTECT,OUTPUT);
 	digitalWrite(WRITE_PROTECT,HIGH);
 
 	readEEPROM(DISK1, EEPROM_address, (char*)buf, 10);
@@ -84,63 +73,45 @@ void setup()
 	pinMode(GREEN_PIN, OUTPUT);
 	set_lcd_color(RED);
 	//ATTACH INTERRUPT
+	pinMode(INTERRUPT_PIN, INPUT_PULLUP);
 	attachInterrupt(INTERRUPT_PIN, hot_swap, CHANGE);
 }
 
 void loop() 
 {
-	if(CARTRIDGE_INTERRUPT == LOW) {
-		if(C_LOOP == 0) {
-			device_num = 0;
-			for(address = 0; address < 127; address++) {
-				Wire.beginTransmission(address);
-				error = Wire.endTransmission(); 
-				if(error == 0) {
-					device_num++;
-				}
-			}
+	if(CARTRIDGE_INTERRUPT == HIGH) {
+		if(C_LOOP == 0){
+			device_num = get_num_devices();
 			if(device_num == 1) {
 				set_lcd_color(WHITE);
 				C_LOOP = 1;
 				lcd.clear();
 				delay(100);
-				char cstr[10] = "INSERT";
 				lcd.print(cstr);
 				delay(100);
 				C_LOOP = 1;
 				digitalWrite(WRITE_PROTECT, LOW);
-				CARTRIDGE_INTERRUPT = HIGH;
 			}
 		}
-	}
-	else {
+	} else if(CARTRIDGE_INTERRUPT == LOW){
 		if(C_LOOP == 1) {
-			//RESET I2C PROTOCOL
-			TWCR = 0;
-			Wire.begin(); //enables pullup resistors in SDA/SCL
-			device_num = 0;
-			for(address = 0; address < 127; address++) {
-				Wire.beginTransmission(address);
-				error = Wire.endTransmission(); 
-				if(error == 0) {
-					device_num++;
-				}
-			}
+			device_num = get_num_devices();
 			if(device_num == 2) {
-				set_lcd_color(RED);
 				for(int i = 0; i < MAX_SAVE_SIZE; i++) {
 					buf[i] = 0;
 				}
 				for(int i = 0; i < MAX_NAME_SIZE; i++) {
 					pedal_name[i] = 0;
 				}
-				digitalWrite(WRITE_PROTECT, HIGH);
 				readEEPROM(DISK1, EEPROM_address, (char*)buf, MAX_NAME_SIZE);
 				get_pedal_name(buf, pedal_name);
 				lcd.clear();
+				delay(100);
+				set_lcd_color(RED);
 				lcd.print(pedal_name);
 				delay(100);
 				C_LOOP = 0;
+				digitalWrite(WRITE_PROTECT, HIGH);
 			}
 		}
 	}
@@ -189,8 +160,10 @@ void set_lcd_color(unsigned int color)
 
 void hot_swap()
 {
-	//CARTRIDGE_INSERTED = (CARTRIDGE_INSERTED == 1) ? 0: 1;
-	CARTRIDGE_INTERRUPT = LOW;
+	CARTRIDGE_INTERRUPT = (CARTRIDGE_INTERRUPT == 1) ? 0: 1;
+	//RESET I2C PROTOCOL
+	TWCR = 0;
+	//CARTRIDGE_INTERRUPT = HIGH;
 }
 
 void get_pedal_name(char* INFO, char* NAME)
@@ -204,4 +177,18 @@ void get_pedal_name(char* INFO, char* NAME)
 		NAME[i] = INFO[i];
 	}
 	return;
+}
+
+int get_num_devices()
+{
+	Wire.begin(); //enables pullup resistors in SDA/SCL
+	int num = 0;
+	for(int address = 0; address < 127; address++) {
+		Wire.beginTransmission(address);
+		error = Wire.endTransmission(); 
+		if(error == 0) {
+			num++;
+		}
+	}
+	return num;
 }
