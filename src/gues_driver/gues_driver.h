@@ -1,5 +1,6 @@
 #ifndef GUES_DRIVER
 #define GUES_DRIVER
+#include <Arduino.h>
 
 void set_lcd_color(unsigned int COLOR);
 
@@ -17,5 +18,7 @@ void hot_swap(); //allows for hot swapping game catridges: requirements- must us
 void get_pedal_name(char* INFO, char* NAME);
 
 int get_num_devices();
+
+void print_insert(); //prints out insert in big letters to LCD
 
 #endif

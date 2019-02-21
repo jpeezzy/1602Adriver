@@ -3,6 +3,8 @@
 #include <LiquidCrystal_I2C.h>
 #include <pins_arduino.h>
 #include "gues_driver.h"
+#include "alphabet.h"
+
 #define RED_PIN 5
 #define GREEN_PIN 6
 #define BLUE_PIN 7
@@ -19,10 +21,10 @@
 #define MAX_VOLTAGE_READING 5 //Max Voltage 
 #define INTERRUPT_PIN INT5 //check if catridge is pulled out
 #define WRITE_PROTECT 3
-
-#define DISK1 0x50 //Address of 24LC256 EEPROM chip
+#define MAX_NAME_SIZE 16
 #define MAX_SAVE_SIZE 16
-#define MAX_NAME_SIZE 10
+
+#define DISK1 0x50 //Address of 24LC256 EEPROM chip #define MAX_SAVE_SIZE 16 #define MAX_NAME_SIZE 10
 #define EEPROM_address 0
 
 LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x27 for a 16x2 display
@@ -41,9 +43,15 @@ void setup()
 	//Serial.begin(9600);
 	Wire.begin(); //enables pullup resistors in SDA/SCL
 	lcd.init();
+	lcd.begin(16,2);
 	lcd.backlight();
 	lcd.setBacklight(255);
-	lcd.setCursor(0, 0); // set the cursor to column 3, line 0
+	lcd.setCursor(0, 0);
+	setup_big_char(&lcd);
+	// Print a message to the LCD.
+	lcd.backlight();
+	lcd.clear();
+
 	//{A2, A1, A0} == 000 (for now)
 	//EEPROM ADDRESS = {1010, A2, A1, A0} = 0x50
 	for(int i = 0; i < 3; i++) {
@@ -83,11 +91,13 @@ void loop()
 		if(C_LOOP == 0){
 			device_num = get_num_devices();
 			if(device_num == 1) {
+				lcd.clear();
 				set_lcd_color(WHITE);
 				C_LOOP = 1;
-				lcd.clear();
 				delay(100);
-				lcd.print(cstr);
+				lcd.setCursor(4, 0);
+				//lcd.print(cstr);
+				print_insert();
 				delay(100);
 				C_LOOP = 1;
 				digitalWrite(WRITE_PROTECT, LOW);
@@ -192,3 +202,12 @@ int get_num_devices()
 	}
 	return num;
 }
+
+void print_insert()
+{
+	customI(&lcd, 0);
+	custom0O(&lcd, 4);
+	customA(&lcd, 8);
+	customD(&lcd, 12);
+}
+
